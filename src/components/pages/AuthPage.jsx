@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { FcGoogle } from 'react-icons/fc';
 import SignUpForm from '../Auth/SignUpForm';
 import LoginForm from '../Auth/LoginForm';
-import authService from '../services/authService'; // Import the authService
+import authService from '../../services/authService'; // Import the authService
 import { useDispatch, useSelector } from 'react-redux'; // Import Redux hooks
 import {
   setAuthSession,
@@ -11,7 +11,7 @@ import {
   setLoading,
   clearAuth,
   clearError
-} from '../features/auth/authSlice';
+} from '../../features/auth/authSlice';
 
 function AuthPage() {
   const [showLogin, setShowLogin] = useState(false);

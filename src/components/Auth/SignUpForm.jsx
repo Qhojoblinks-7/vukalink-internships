@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { useDispatch, useSelector } from 'react-redux'; // Import Redux hooks
-import { signUpUser, clearError } from '../features/auth/authSlice'; // Import thunk and action
+import { signUpUser, clearError } from '../../features/auth/authSlice'; // Import thunk and action
 
 function SignUpForm({ onSignUpSuccess }) {
   const [showPassword, setShowPassword] = useState(false);
