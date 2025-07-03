@@ -1,7 +1,7 @@
 // src/components/Layout.jsx
 import React from 'react';
-import Navbar from './Navbar';
-import Footer from './Footer';
+import Navbar from './DesktopHome/Navbar';
+import Footer from './DesktopHome/Footer';
 
 function Layout({ children }) {
   return (

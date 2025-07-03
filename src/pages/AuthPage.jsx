@@ -1,88 +1,98 @@
-// src/pages/AuthPage.jsx
+// src/pages/AuthPage.jsx (Updated Snippet)
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom'; // Import useNavigate
 import { FcGoogle } from 'react-icons/fc';
-import SignUpForm from '../Auth/SignUpForm';
-import LoginForm from '../Auth/LoginForm';
-import authService from '../../services/authService'; // Import the authService
-import { useDispatch, useSelector } from 'react-redux'; // Import Redux hooks
+import SignUpForm from '../components/Auth/SignUpForm';
+import LoginForm from '../components/Auth/LoginForm';
+import authService from '../services/authService';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   setAuthSession,
   fetchCurrentUserAndProfile,
   setLoading,
   clearAuth,
-  clearError
-} from '../../features/auth/authSlice';
+  clearError,
+  signOutUser
+} from '../features/auth/authSlice';
+import { supabase } from '../lib/supabaseClient';
 
 function AuthPage() {
   const [showLogin, setShowLogin] = useState(false);
+  const [emailConfirmedMessage, setEmailConfirmedMessage] = useState('');
   const dispatch = useDispatch();
+  const navigate = useNavigate(); // Initialize useNavigate
+  const location = useLocation();
+
   const { isAuthenticated, isLoading, user, error } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    // Set initial loading state
-    dispatch(setLoading(true));
+    // Check URL for email confirmation message
+    const queryParams = new URLSearchParams(location.search);
+    if (queryParams.get('email_confirmed') === 'true') {
+      setEmailConfirmedMessage('Your email has been successfully confirmed! Please log in below.');
+      navigate(location.pathname, { replace: true });
+    }
 
-    // Listen for auth state changes from Supabase
-    const authListener = authService.onAuthStateChange(async (event, session) => {
+    if (!isAuthenticated && !user && !isLoading) {
+        dispatch(setLoading(true));
+    }
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Supabase Auth Event:', event, 'Session:', session);
       if (session) {
-        // When a user signs in or session is restored
-        // We fetch the full user object including our custom profile data
-        dispatch(fetchCurrentUserAndProfile());
+        dispatch(setAuthSession(session));
+        await dispatch(fetchCurrentUserAndProfile());
+        // Redirect to "My Applications" page after successful login/session restore
+        navigate('/my-applications', { replace: true }); // <--- THIS IS THE KEY CHANGE
       } else {
-        // When a user signs out or no session exists
-        dispatch(clearAuth()); // Clear auth state in Redux
+        dispatch(clearAuth());
       }
-      dispatch(setLoading(false)); // Finished initial loading check
+      dispatch(setLoading(false));
     });
 
-    // Cleanup the listener on component unmount
     return () => {
-      authListener.subscription.unsubscribe();
+      if (authListener && authListener.subscription) {
+        authListener.subscription.unsubscribe();
+      }
     };
-  }, [dispatch]); // Dependency array to run only once
+  }, [dispatch, location.search, location.pathname, navigate, isAuthenticated, user, isLoading]); // Added missing dependencies
 
   const handleGoogleSignIn = async () => {
-    dispatch(clearError()); // Clear any previous errors
+    dispatch(clearError());
+    dispatch(setLoading(true));
     try {
-      await authService.signInWithGoogle();
-      // Supabase redirects, so no further client-side logic here for successful initiation.
+      // For Google OAuth, the redirectTo ensures Supabase sends the user back
+      // to your app, and then the onAuthStateChange listener takes over.
+      await authService.signInWithGoogle({ redirectTo: window.location.origin + '/my-applications' }); // Optional: direct Google to dashboard after auth
     } catch (err) {
       console.error('Google Sign-in initiation failed:', err.message);
-      dispatch(clearError(err.message)); // Set error in Redux state
-      alert(`Google Sign-in failed: ${err.message}`);
+      dispatch(clearError(err.message));
+    } finally {
+      dispatch(setLoading(false));
     }
   };
 
   const handleAuthSuccess = () => {
-    // This callback is triggered after a successful email/password signup or login.
-    // The `onAuthStateChange` listener will then detect the new session
-    // and dispatch `fetchCurrentUserAndProfile` to populate the Redux store.
     console.log("Form submission successful. Auth state will update via listener.");
-    // If you were using React Router, this is where you might navigate:
-    // navigate('/dashboard');
+    if (!showLogin) { // If it was a sign-up
+      setEmailConfirmedMessage("Account created! Please check your email to confirm your account, then log in.");
+    }
   };
 
-  // If already authenticated and user data is loaded, maybe redirect or show dashboard
-  if (!isLoading && isAuthenticated && user) {
-    // In a real app, you would redirect to your main application dashboard
-    // For now, let's just show a logged-in message.
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-        <h1 className="text-3xl font-bold text-green-700 mb-4">Welcome, {user.profile?.full_name || user.email}!</h1>
-        <p className="text-lg text-gray-700">Your role: {user.profile?.user_type}</p>
-        <button
-          onClick={() => dispatch(signOutUser())} // Dispatch logout action
-          className="mt-6 px-6 py-3 bg-red-500 text-white rounded-md hover:bg-red-600 transition duration-300"
-        >
-          Sign Out
-        </button>
-      </div>
-    );
+  // --- Conditional Rendering Logic ---
+
+  // Instead of showing a "Welcome" message here, directly redirect.
+  // The `Maps` call inside `useEffect` already handles this.
+  // This `if (isAuthenticated && user)` block should ideally not be reached
+  // if navigation is working correctly, but it's good for fallback/development.
+  if (isAuthenticated && user) {
+     // If for some reason the navigate above didn't fire or there's a slight delay,
+     // you can add a fallback redirect here.
+     navigate('/my-applications', { replace: true });
+     return null; // Or a simple loading screen while redirecting
   }
 
-  // Show loading indicator
-  if (isLoading) {
+  if (isLoading && !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <p>Loading authentication state...</p>
@@ -92,15 +102,11 @@ function AuthPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      {/* ... (rest of your AuthPage JSX remains the same) ... */}
       <div className="max-w-4xl w-full bg-white rounded-xl shadow-lg flex flex-col md:flex-row overflow-hidden">
-
         {/* Left Column: Welcome/Branding Area */}
         <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col items-center justify-center text-center">
-          <img
-            className="h-16 w-auto mb-6"
-            src="/vukalink-logo.png"
-            alt="VukaLink Logo"
-          />
+          <img className="h-16 w-auto mb-6" src="/vukalink-logo.png" alt="VukaLink Logo"/>
           <h2 className="text-3xl font-extrabold text-gray-900 mb-2">
             {showLogin ? "Welcome Back!" : "Start Your Journey"}
           </h2>
@@ -119,12 +125,16 @@ function AuthPage() {
 
         {/* Right Column: Dynamic Form Area (Sign Up or Log In) */}
         <div className="w-full md:w-1/2 p-8 md:p-12 border-t md:border-t-0 md:border-l border-gray-200 flex flex-col justify-center">
+          {emailConfirmedMessage && (
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+              <span className="block sm:inline">{emailConfirmedMessage}</span>
+            </div>
+          )}
 
-          {/* Conditional error display for AuthPage itself (e.g. Google sign-in errors) */}
           {error && !isLoading && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-                <span className="block sm:inline">{error}</span>
-              </div>
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+              <span className="block sm:inline">{error}</span>
+            </div>
           )}
 
           {showLogin ? (
@@ -139,7 +149,7 @@ function AuthPage() {
                 Don't have an account?{' '}
                 <a
                   href="#"
-                  onClick={(e) => { e.preventDefault(); setShowLogin(false); dispatch(clearError()); }}
+                  onClick={(e) => { e.preventDefault(); setShowLogin(false); dispatch(clearError()); setEmailConfirmedMessage(''); }}
                   className="font-medium text-orange-500 hover:text-orange-600"
                 >
                   Sign Up
@@ -150,7 +160,7 @@ function AuthPage() {
                 Already have an account?{' '}
                 <a
                   href="#"
-                  onClick={(e) => { e.preventDefault(); setShowLogin(true); dispatch(clearError()); }}
+                  onClick={(e) => { e.preventDefault(); setShowLogin(true); dispatch(clearError()); setEmailConfirmedMessage(''); }}
                   className="font-medium text-orange-500 hover:text-orange-600"
                 >
                   Log In
