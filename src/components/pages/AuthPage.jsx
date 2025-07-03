@@ -1,8 +1,8 @@
 // src/pages/AuthPage.jsx
 import React, { useState, useEffect } from 'react';
 import { FcGoogle } from 'react-icons/fc';
-import SignUpForm from '../components/SignUpForm';
-import LoginForm from '../components/LoginForm';
+import SignUpForm from '../Auth/SignUpForm';
+import LoginForm from '../Auth/LoginForm';
 import authService from '../services/authService'; // Import the authService
 import { useDispatch, useSelector } from 'react-redux'; // Import Redux hooks
 import {
